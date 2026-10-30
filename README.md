@@ -87,14 +87,3 @@ hard         ▂▄▅▆▇██████▇▇▆▆▅▄▃▂▁       
 ```
 
 Each cell is that Beta posterior over P(success), with its mean, effective sample size, and win%, which is how often the router would pick that model once cost is included. A sharp spike means the router is confident. A wide curve means it isn't, because the model was never tried or decay has pulled it back toward the prior. Each curve is scaled to its own peak, so read the certainty from `n`.
-
-## Open questions
-
-- **Reward bias.** Human feedback is mostly negative and comes mostly from cheap-model routes. Users who say nothing did not necessarily succeed. Judges have biases too: LLM judges are known to favor long answers and their own model family, and Jev's biases on this task are untested. Use objective signals where they exist: tests pass, the parent agent accepts the sub-agent's result.
-- **Counterfactual replay** works for self-contained sub-agent tasks. It could give a new model an informed prior instead of a uniform one. It does not work honestly for multi-turn sessions, because the conversation goes differently once a different model answers.
-- **Exploration costs real users.** Informed priors per bucket could keep weak models away from high-stakes buckets, instead of adding a separate tier floor or exploration cap.
-- **Bucket splits.** Is the split test reliable? Split a suspect bucket's history by a sub-feature and check whether the best model changes between the halves.
-- **Switching up late in a session** on strong failure signals, such as repeated test failures or user corrections, might be worth the cache cost.
-- **Scope.** Posteriors per org or per repo, and how to share priors between them.
-
-Logs (`*.jsonl`) are git-ignored, because they contain task text.
