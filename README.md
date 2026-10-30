@@ -59,7 +59,7 @@ log_event("log.jsonl", task=task, bucket=bucket, confidence=confidence,
 ## Pieces
 
 - **Buckets** come from a [Jev](https://docs.typesafe.ai/introduction) Choice prompt. Cold start: take about 10 buckets and cut a sample of past conversations with them. Tune the buckets by editing the prompt, not by training. Choice `confidence` flags inputs that fall between buckets.
-- **Bandit.** A Beta posterior for each (bucket, model) pair. The router picks the model with the highest `θ − λ·cost`. λ is one knob that means "how much quality per dollar we demand". Every update decays all arms in the bucket toward the prior, so recent outcomes count more and models we stopped using get re-explored.
+- **Bandit.** [Thompson sampling](https://en.wikipedia.org/wiki/Thompson_sampling) with a Beta posterior for each (bucket, model) pair. The router picks the model with the highest `θ − λ·cost`. λ is one knob that means "how much quality per dollar we demand". Every update decays all arms in the bucket toward the prior, so recent outcomes count more and models we stopped using get re-explored.
 - **Reward** is a value in [0, 1]: a Jev Score rubric for explicit partial credit, plus Noul checks, combined in code, plus human feedback ("give me a smarter model"). Fractional updates: `α += r`, `β += 1 − r`.
 - **New models** join with the uniform prior and get explored. Optionally, replay history with the new model to set an informed prior.
 - **Raw log first.** Store each input, model, cost, and outcome. Buckets are a view on top of that log. When the classifier prompt changes, re-classify the history and rebuild the posteriors. The same log lets you test a new bucketing offline before you ship it.
