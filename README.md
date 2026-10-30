@@ -24,7 +24,7 @@ input → classify into a bucket (Jev Choice)
       → periodically re-cut the buckets by editing the classifier prompt, then replay the history
 ```
 
-Jev is a typed LLM: Choice picks one option from a list, Score rates against an ordinal rubric, and Noul tests a statement and returns 0–1. [Thompson sampling](https://en.wikipedia.org/wiki/Thompson_sampling) keeps a Beta posterior per (bucket, model) and picks by sampling from them, so it explores exactly as much as it is uncertain.
+Jev is TypeSafe's System One model. It doesn't generate text: it answers typed questions about an input with structured values. Choice picks one option from a list, Score rates against an ordinal rubric, and Noul tests a statement and returns 0–1. [Thompson sampling](https://en.wikipedia.org/wiki/Thompson_sampling) keeps a Beta posterior per (bucket, model) and picks by sampling from them, so it explores exactly as much as it is uncertain.
 
 ## The buckets don't need to mean anything
 
@@ -90,7 +90,7 @@ Each cell is that Beta posterior over P(success), with its mean, effective sampl
 
 ## Open questions
 
-- **Reward bias.** Human feedback is mostly negative and comes mostly from cheap-model routes. Users who say nothing did not necessarily succeed. LLM judges tend to favor long answers and possibly their own model family. Use objective signals where they exist: tests pass, the parent agent accepts the sub-agent's result.
+- **Reward bias.** Human feedback is mostly negative and comes mostly from cheap-model routes. Users who say nothing did not necessarily succeed. Judges have biases too: LLM judges are known to favor long answers and their own model family, and Jev's biases on this task are untested. Use objective signals where they exist: tests pass, the parent agent accepts the sub-agent's result.
 - **Counterfactual replay** works for self-contained sub-agent tasks. It could give a new model an informed prior instead of a uniform one. It does not work honestly for multi-turn sessions, because the conversation goes differently once a different model answers.
 - **Exploration costs real users.** Informed priors per bucket could keep weak models away from high-stakes buckets, instead of adding a separate tier floor or exploration cap.
 - **Bucket splits.** Is the split test reliable? Split a suspect bucket's history by a sub-feature and check whether the best model changes between the halves.
