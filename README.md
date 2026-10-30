@@ -44,7 +44,7 @@ Switching late in a session costs the cached prefix again, so it is out of scope
 
 ## Code
 
-- `jev.py`: `classify(task)` uses Jev Choice over `BUCKETS`. `judge(task, response)` asks a Jev Score rubric (normalized by number of levels, so max 2/3) plus the Noul `CHECKS`, and `reward()` averages them. `python3 jev.py` makes live calls and needs `TYPESAFE_API_KEY` in `.env`.
+- `jev.py`: `classify(task)` uses Jev Choice over `BUCKETS`. `judge(task, response)` asks a Jev Score rubric (level index ÷ (levels − 1), so 0–1) plus the Noul `CHECKS`, and `reward()` averages them. `python3 jev.py` makes live calls and needs `TYPESAFE_API_KEY` in `.env`.
 - `router.py`: `Router` is the bandit. `log_event()` appends raw JSONL. `rebuild(log, bucket_fn=, reward_fn=)` replays the log, with optional re-bucketing or re-weighting. `python3 router.py` runs offline and checks two things:
   - The simulation converges, adapts to drift, and picks up a new model.
   - A router rebuilt from its own log matches the live router exactly.

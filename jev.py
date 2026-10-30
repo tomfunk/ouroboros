@@ -19,8 +19,8 @@ BUCKETS = {
     "research": "Open-ended investigation needing external info or many sources",
 }
 
-# Score rubric: gives explicit partial credit. Normalized as score / len(levels), so a
-# perfect response maxes out at 2/3, not 1.
+# Score rubric: gives explicit partial credit. Score is the level index (0-based), so
+# dividing by the top index (levels - 1) maps every rubric onto [0, 1].
 QUALITY_LEVELS = ["Fails or is wrong", "Partially accomplishes it", "Fully and correctly accomplishes it"]
 
 # Atomic pass/fail checks, combined in code (see reward()). Edit freely; the raw
@@ -72,7 +72,7 @@ def judge(task, response):
     questions |= {k: {"type": "noul", "instructions": v} for k, v in CHECKS.items()}
     answers = _ask(json.dumps({"task": task, "response": response}), questions)
     j = {k: a.get("noul") for k, a in answers.items()}
-    j["quality"] = answers["quality"]["score"] / len(QUALITY_LEVELS)
+    j["quality"] = answers["quality"]["score"] / (len(QUALITY_LEVELS) - 1)
     return j
 
 
