@@ -37,11 +37,11 @@ The router never needs to know *why* a model suits a bucket. It just measures wh
 
 ## When to route
 
-Switch models only where the prompt cache is already cold:
+Switch models only where the prompt cache is cold, or still small enough that switching is cheap:
 
 1. **Sub-agent spawn.** A new session, with a scoped task written by the parent. This is the best input for routing and the cleanest outcome signal. Start here.
 2. **Post-compaction.** The compaction summary is a good routing input.
-3. **Session start.** The weakest of the three, because the first prompts are often vague.
+3. **Early in a session.** Not just the first prompt: the first few turns, before the cached prefix grows and switching gets expensive. Routing after a turn or two also helps, because the very first prompts are often vague.
 
 Switching late in a session costs the cached prefix again, so it is out of scope.
 
