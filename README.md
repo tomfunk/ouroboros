@@ -26,6 +26,36 @@ Switch models only where the prompt cache is already cold:
 
 Switching late in a session costs the cached prefix again, so it is out of scope. One possible exception for later: switching up to a stronger model on strong failure signals, such as repeated test failures or repeated user corrections.
 
+## The loop, step by step
+
+Take one sub-agent spawn. The parent writes the task, for example "Write unit tests for the date parsing helper in utils/dates.py".
+
+1. **Classify.** `jev.classify(task)` returns `("tests", 1.00, {...})`. The confidence is kept: a low value means the task sits between buckets.
+2. **Route.** `router.route("tests")` draws θ from each model's Beta posterior for this bucket, subtracts `λ·cost`, and picks the highest score. A cheap model with a good track record usually wins. An uncertain model sometimes wins, and that is the exploration.
+3. **Run.** The sub-agent runs on the chosen model, as normal. This is the one step this repo does not implement.
+4. **Judge.** `jev.judge(task, response)` returns a 0–1 quality score from the rubric, plus three 0–1 Noul checks. `jev.reward()` averages them into one reward. Human feedback, such as "give me a smarter model", can override it.
+5. **Update.** `router.update("tests", model, reward)` decays every model in the bucket a little toward the prior, then adds the reward to the chosen model. The next "tests" task is routed with this new evidence.
+6. **Log.** `log_event(log, task=..., bucket=..., model=..., cost=..., judge=..., reward=...)` appends the raw record.
+7. **Feed the log back in.** This is the ouroboros part. Every so often, read the log:
+   - A bucket where no model wins, or where confidence is low, is a candidate to split. Edit `BUCKETS`.
+   - `rebuild(log, bucket_fn=jev.classify)` re-buckets all the history with the new prompt and rebuilds the posteriors. No training, and no data lost.
+   - `rebuild(log, reward_fn=...)` tries a different reward weighting on the old judge answers.
+   - A new model is added with `router.add_model()`, and exploration finds out where it is good enough.
+
+In code, steps 1–6 for one task:
+
+```python
+bucket, confidence, _ = jev.classify(task)
+model = router.route(bucket)
+response = run_subagent(model, task)    # your harness
+j = jev.judge(task, response)
+router.update(bucket, model, jev.reward(j))
+log_event("log.jsonl", task=task, bucket=bucket, confidence=confidence,
+          model=model, cost=router.costs[model], judge=j, reward=jev.reward(j))
+```
+
+`python3 router.py` runs this loop with simulated buckets and rewards. `python3 jev.py` runs steps 1 and 4 for real.
+
 ## Pieces
 
 - **Buckets** come from a [Jev](https://docs.typesafe.ai/introduction) Choice prompt. Cold start: take about 10 buckets and cut a sample of past conversations with them. Tune the buckets by editing the prompt, not by training. Choice `confidence` flags inputs that fall between buckets.
@@ -49,4 +79,4 @@ Switching late in a session costs the cached prefix again, so it is out of scope
   - The simulation converges, adapts to drift, and picks up a new model.
   - A router rebuilt from its own log matches the live router exactly.
 
-Not wired up yet: running the routed model for real. Logs (`*.jsonl`) are git-ignored, because they contain task text.
+Not included, on purpose: running the routed model (step 3). That belongs to whatever harness spawns the sub-agents. Logs (`*.jsonl`) are git-ignored, because they contain task text.
