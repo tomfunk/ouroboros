@@ -56,6 +56,15 @@ log_event("log.jsonl", task=task, bucket=bucket, confidence=confidence,
 
 `python3 router.py` runs this loop with simulated buckets and rewards. `python3 jev.py` runs steps 1 and 4 for real.
 
+## The buckets don't need to mean anything
+
+What a bucket is doesn't matter. "Tests", "debugging" and "design" are just convenient starting labels. A bucket is useful if it has two properties:
+
+- **Coherent.** Tasks in the same bucket behave alike across models: the model that is good enough for one is good enough for the others.
+- **Reachable every time.** The same kind of input lands in the same bucket every time. Jev makes this possible, because Choice returns a typed answer from a fixed list rather than free text, and its `confidence` shows when an input is close to a boundary.
+
+The router never needs to know *why* a model suits a bucket. The statistics show empirically what works there, so nobody has to theorize about it. If the buckets were "tasks that mention dates" and "tasks that don't", the bandit would still learn the right model for each, as long as those groups behave consistently. That is why buckets can be cheap to change: edit the prompt, replay the log, and keep the new cut if the statistics get sharper.
+
 ## Pieces
 
 - **Buckets** come from a [Jev](https://docs.typesafe.ai/introduction) Choice prompt. Cold start: take about 10 buckets and cut a sample of past conversations with them. Tune the buckets by editing the prompt, not by training. Choice `confidence` flags inputs that fall between buckets.
