@@ -3,7 +3,32 @@
 Buckets come from a classifier (Jev Choice in the real thing); rewards in [0, 1]
 come from a judge (Jev Score) or human feedback. Here both are simulated.
 """
+import json
 import random
+import time
+
+
+def log_event(path, **record):
+    """Append one routing outcome. Keep it raw (task, model, cost, judge answers)."""
+    with open(path, "a") as f:
+        f.write(json.dumps({"ts": time.time(), **record}) + "\n")
+
+
+def rebuild(path, lam=1.0, gamma=0.99, reward_fn=None, bucket_fn=None):
+    """Replay the log in order into a fresh Router.
+
+    Pass bucket_fn (e.g. jev.classify) to re-bucket history after editing buckets,
+    or reward_fn to re-weight judge answers. Otherwise uses what was logged.
+    """
+    r = Router({}, lam, gamma)
+    with open(path) as f:
+        for line in f:
+            e = json.loads(line)
+            if e["model"] not in r.costs:
+                r.add_model(e["model"], e["cost"])  # an arm at the prior decays as a no-op, so late add is exact
+            bucket = bucket_fn(e["task"])[0] if bucket_fn else e["bucket"]
+            r.update(bucket, e["model"], reward_fn(e["judge"]) if reward_fn else e["reward"])
+    return r
 
 
 class Router:
@@ -75,5 +100,29 @@ def simulate(steps=3000, seed=0):
     print("ok")
 
 
+def check_replay(path):
+    """Live router state must equal the state rebuilt from its own log."""
+    random.seed(1)
+    costs = {"haiku": 0.05, "sonnet": 0.15, "opus": 0.40}
+    r = Router(costs)
+    for i in range(500):
+        if i == 250:
+            r.add_model("fable", 0.10)
+        b = random.choice(["boilerplate", "hard"])
+        m = r.route(b)
+        rew = random.random()
+        r.update(b, m, rew)
+        log_event(path, task=f"t{i}", bucket=b, model=m, cost=r.costs[m], judge={}, reward=rew)
+    rr = rebuild(path)
+    assert r.costs == rr.costs
+    assert all(abs(a - c) < 1e-9 for k in r.post for a, c in zip(r.post[k], rr.post[k])), "replay diverged"
+    print("replay ok")
+
+
 if __name__ == "__main__":
+    import os
+    import tempfile
+
     simulate()
+    with tempfile.TemporaryDirectory() as d:
+        check_replay(os.path.join(d, "log.jsonl"))

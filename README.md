@@ -42,12 +42,11 @@ Switching late in a session costs the cached prefix again, so it is out of scope
 - **Bucket coherence.** Two warning signs: no model wins despite lots of data, low Choice confidence, or both. Test: split the bucket's history by a sub-feature and check whether the best model changes between the halves.
 - **Scope.** Posteriors per org or per repo, and how to share priors between them.
 
-## Toy
+## Code
 
-`python3 router.py` runs a simulation with no LLM calls and checks three things:
+- `jev.py`: `classify(task)` uses Jev Choice over `BUCKETS`. `judge(task, response)` uses Jev Score plus the Noul `CHECKS`, and `reward()` combines them. `python3 jev.py` makes live calls and needs `TYPESAFE_API_KEY` in `.env`.
+- `router.py`: `Router` is the bandit. `log_event()` appends raw JSONL. `rebuild(log, bucket_fn=, reward_fn=)` replays the log, with optional re-bucketing or re-weighting. `python3 router.py` runs offline and checks two things:
+  - The simulation converges, adapts to drift, and picks up a new model.
+  - A router rebuilt from its own log matches the live router exactly.
 
-- The router converges to the cheapest model that is good enough in each bucket.
-- It adapts when a model's quality drifts in the middle of the run.
-- It picks up a model that is added in the middle of the run.
-
-The buckets and rewards are simulated. Jev comes next.
+Not wired up yet: running the routed model for real. Logs (`*.jsonl`) are git-ignored, because they contain task text.
