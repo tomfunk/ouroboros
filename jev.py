@@ -1,4 +1,4 @@
-"""Jev calls: bucket a routing input (Choice) and judge a response (Score + Noul)."""
+"""Jev calls: bucket a routing input (Choice) and judge a response (Noul)."""
 import json
 import os
 import sys
@@ -59,18 +59,10 @@ def classify(task):
 
 
 def judge(task, response):
-    """Return raw judge answers: {"quality": score in [0, 1], <check>: noul in [0, 1]}."""
-    levels = ["Fails or is wrong", "Partially accomplishes it", "Fully and correctly accomplishes it"]
-    questions = {"quality": {
-        "type": "score",
-        "instructions": "How well the response accomplishes the task",
-        "criteria": levels,
-    }}
-    questions |= {k: {"type": "noul", "instructions": v} for k, v in CHECKS.items()}
+    """Return raw judge answers: {<check>: noul in [0, 1]}."""
+    questions = {k: {"type": "noul", "instructions": v} for k, v in CHECKS.items()}
     answers = _ask(json.dumps({"task": task, "response": response}), questions)
-    j = {k: a.get("noul") for k, a in answers.items()}
-    j["quality"] = answers["quality"]["score"] / (len(levels) - 1)  # Score is the expected level index
-    return j
+    return {k: a["noul"] for k, a in answers.items()}
 
 
 def reward(j):

@@ -11,7 +11,7 @@ So instead:
 ```
 input → classify into a bucket (Jev Choice)
       → Thompson-sample a model for that bucket (with recency decay and a cost penalty)
-      → collect the outcome (Jev Score / Noul judge, human feedback)
+      → collect the outcome (Jev Noul judge, human feedback)
       → update that bucket's posterior for that model
       → periodically re-cut the buckets by editing the classifier prompt, then replay the history
 ```
@@ -30,7 +30,7 @@ Switching late in a session costs the cached prefix again, so it is out of scope
 
 - **Buckets** come from a [Jev](https://docs.typesafe.ai/introduction) Choice prompt. Cold start: take about 10 buckets and cut a sample of past conversations with them. Tune the buckets by editing the prompt, not by training. Choice `confidence` flags inputs that fall between buckets.
 - **Bandit.** A Beta posterior for each (bucket, model) pair. The router picks the model with the highest `θ − λ·cost`. λ is one knob that means "how much quality per dollar we demand". Every update decays all arms in the bucket toward the prior, so recent outcomes count more and models we stopped using get re-explored.
-- **Reward** is a value in [0, 1]: a Jev Score against a rubric, or several Noul criteria combined in code, plus human feedback ("give me a smarter model"). Fractional updates: `α += r`, `β += 1 − r`.
+- **Reward** is a value in [0, 1]: several Jev Noul checks (each already in [0, 1]) combined in code, plus human feedback ("give me a smarter model"). Fractional updates: `α += r`, `β += 1 − r`.
 - **New models** join with the uniform prior and get explored. Optionally, replay history with the new model to set an informed prior.
 - **Raw log first.** Store each input, model, cost, and outcome. Buckets are a view on top of that log. When the classifier prompt changes, re-classify the history and rebuild the posteriors. The same log lets you test a new bucketing offline before you ship it.
 
@@ -44,7 +44,7 @@ Switching late in a session costs the cached prefix again, so it is out of scope
 
 ## Code
 
-- `jev.py`: `classify(task)` uses Jev Choice over `BUCKETS`. `judge(task, response)` uses Jev Score plus the Noul `CHECKS`, and `reward()` combines them. `python3 jev.py` makes live calls and needs `TYPESAFE_API_KEY` in `.env`.
+- `jev.py`: `classify(task)` uses Jev Choice over `BUCKETS`. `judge(task, response)` asks the Jev Noul `CHECKS`, and `reward()` averages them. `python3 jev.py` makes live calls and needs `TYPESAFE_API_KEY` in `.env`.
 - `router.py`: `Router` is the bandit. `log_event()` appends raw JSONL. `rebuild(log, bucket_fn=, reward_fn=)` replays the log, with optional re-bucketing or re-weighting. `python3 router.py` runs offline and checks two things:
   - The simulation converges, adapts to drift, and picks up a new model.
   - A router rebuilt from its own log matches the live router exactly.
