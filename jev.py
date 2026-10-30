@@ -1,4 +1,4 @@
-"""Jev calls: bucket a routing input (Choice) and judge a response (Noul)."""
+"""Jev calls: bucket a routing input (Choice) and judge a response (Score + Noul)."""
 import json
 import os
 import sys
@@ -18,6 +18,10 @@ BUCKETS = {
     "docs": "Writing or editing prose: docs, READMEs, comments, messages",
     "research": "Open-ended investigation needing external info or many sources",
 }
+
+# Score rubric: gives explicit partial credit. Normalized as score / len(levels), so a
+# perfect response maxes out at 2/3, not 1.
+QUALITY_LEVELS = ["Fails or is wrong", "Partially accomplishes it", "Fully and correctly accomplishes it"]
 
 # Atomic pass/fail checks, combined in code (see reward()). Edit freely; the raw
 # answers are logged, so old records can be re-weighted on replay.
@@ -59,10 +63,17 @@ def classify(task):
 
 
 def judge(task, response):
-    """Return raw judge answers: {<check>: noul in [0, 1]}."""
-    questions = {k: {"type": "noul", "instructions": v} for k, v in CHECKS.items()}
+    """Return judge answers in [0, 1]: {"quality": normalized score, <check>: noul}."""
+    questions = {"quality": {
+        "type": "score",
+        "instructions": "How well the response accomplishes the task",
+        "criteria": QUALITY_LEVELS,
+    }}
+    questions |= {k: {"type": "noul", "instructions": v} for k, v in CHECKS.items()}
     answers = _ask(json.dumps({"task": task, "response": response}), questions)
-    return {k: a["noul"] for k, a in answers.items()}
+    j = {k: a.get("noul") for k, a in answers.items()}
+    j["quality"] = answers["quality"]["score"] / len(QUALITY_LEVELS)
+    return j
 
 
 def reward(j):
