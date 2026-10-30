@@ -4,6 +4,7 @@ Buckets come from a classifier (Jev Choice in the real thing); rewards in [0, 1]
 come from a judge (Jev Score) or human feedback. Here both are simulated.
 """
 import json
+import math
 import random
 import time
 
@@ -98,6 +99,45 @@ def simulate(steps=3000, seed=0):
     print("phase 3 (fable added):", best)
     assert best == {"boilerplate": "fable", "hard": "fable"}
     print("ok")
+    return r
+
+
+SPARK = " ▁▂▃▄▅▆▇█"
+
+
+def beta_spark(a, b, width=20):
+    """Beta(a, b) PDF over [0, 1] as a sparkline, scaled to its own peak."""
+    logz = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+    xs = [(i + 0.5) / width for i in range(width)]
+    ys = [math.exp(logz + (a - 1) * math.log(x) + (b - 1) * math.log(1 - x)) for x in xs]
+    top = max(ys)
+    return "".join(SPARK[round(y / top * (len(SPARK) - 1))] for y in ys)
+
+
+def report(r, width=20, draws=2000):
+    """Grid of Beta posteriors: rows are buckets, columns are models.
+
+    Each cell: the posterior curve (x = P(success), 0 to 1), then mean, effective
+    sample size, and win% = how often route() picks this model, cost penalty included.
+    """
+    models = list(r.costs)
+    buckets = sorted({b for b, _ in r.post})
+    col = width + 2
+    label = max([6, *map(len, buckets)]) + 2
+    print(" " * label + "".join(f"{m} (cost {r.costs[m]:.2f})".ljust(col) for m in models))
+    axis = "0" + "·" * (width - 2) + "1"
+    print(" " * label + "".join(axis.ljust(col) for _ in models))
+    for b in buckets:
+        wins = dict.fromkeys(models, 0)
+        for _ in range(draws):
+            wins[r.route(b)] += 1
+        curves, stats = [], []
+        for m in models:
+            a, bb = r._ab(b, m)
+            curves.append(beta_spark(a, bb, width).ljust(col))
+            stats.append(f"μ{a / (a + bb):.2f} n{a + bb - 2:.0f} win{wins[m] / draws:.0%}".ljust(col))
+        print(b.ljust(label) + "".join(curves))
+        print(" " * label + "".join(stats))
 
 
 def check_replay(path):
@@ -121,8 +161,14 @@ def check_replay(path):
 
 if __name__ == "__main__":
     import os
+    import sys
     import tempfile
 
-    simulate()
-    with tempfile.TemporaryDirectory() as d:
-        check_replay(os.path.join(d, "log.jsonl"))
+    if len(sys.argv) > 1:  # python3 router.py log.jsonl -> show the posteriors in a real log
+        report(rebuild(sys.argv[1]))
+    else:
+        r = simulate()
+        with tempfile.TemporaryDirectory() as d:
+            check_replay(os.path.join(d, "log.jsonl"))
+        print()
+        report(r)

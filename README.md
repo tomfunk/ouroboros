@@ -88,4 +88,17 @@ The router never needs to know *why* a model suits a bucket. The statistics show
   - The simulation converges, adapts to drift, and picks up a new model.
   - A router rebuilt from its own log matches the live router exactly.
 
+  It then prints the posterior grid: one row per bucket, one column per model. Each cell shows that Beta distribution (x = P(success), 0 to 1), its mean, its effective sample size, and win%, which is how often the router would pick that model once cost is included. `python3 router.py log.jsonl` prints the same grid for a real log.
+
+  ```
+               haiku (cost 0.05)     sonnet (cost 0.15)    opus (cost 0.40)      fable (cost 0.10)
+               0··················1  0··················1  0··················1  0··················1
+  boilerplate  ▁▂▃▄▅▆▇█████▇▇▆▅▄▃▁   ▁▂▃▄▄▅▆▆▇▇▇██████▇▆▄  ████████████████████                   ▁█▄
+               μ0.49 n3 win3%        μ0.57 n1 win1%        μ0.50 n0 win0%        μ0.94 n96 win97%
+  hard         ▂▄▅▆▇██████▇▇▆▆▅▄▃▂▁   ▁▁▂▃▄▄▅▅▆▇▇▇████▇▆▅  ████████████████████                   ▃█
+               μ0.46 n2 win4%        μ0.62 n2 win3%        μ0.50 n0 win0%        μ0.91 n97 win93%
+  ```
+
+  A sharp spike means the router is confident. A flat bar is the prior: either a model was never tried, or decay has pulled it back so it gets re-explored. Each curve is scaled to its own peak, so read the certainty from `n`.
+
 Not included, on purpose: running the routed model (step 3). That belongs to whatever harness spawns the sub-agents. Logs (`*.jsonl`) are git-ignored, because they contain task text.
