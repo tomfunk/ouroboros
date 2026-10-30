@@ -1,0 +1,53 @@
+# ouroboros
+
+Data-driven model routing without fine-tuning a router. The system's own routing history is the data used to tune it.
+
+## Idea
+
+Different models are good enough for different tasks. Cheap, fast models handle boilerplate. Expensive models handle hard reasoning. Asking a model "how hard is this?" is a guess with no evidence behind it. A fine-tuned router has evidence, but it goes stale: new models ship, model behavior shifts, and what works differs across orgs and repos.
+
+So instead:
+
+```
+input → classify into a bucket (Jev Choice)
+      → Thompson-sample a model for that bucket (with recency decay and a cost penalty)
+      → collect the outcome (Jev Score / Noul judge, human feedback)
+      → update that bucket's posterior for that model
+      → periodically re-cut the buckets by editing the classifier prompt, then replay the history
+```
+
+## When to route
+
+Switch models only where the prompt cache is already cold:
+
+1. **Sub-agent spawn.** A new session, with a scoped task written by the parent. This is the best input for routing and the cleanest outcome signal. Start here.
+2. **Post-compaction.** The compaction summary is a good routing input.
+3. **Session start.** The weakest of the three, because the first prompts are often vague.
+
+Switching late in a session costs the cached prefix again, so it is out of scope. One possible exception for later: switching up to a stronger model on strong failure signals, such as repeated test failures or repeated user corrections.
+
+## Pieces
+
+- **Buckets** come from a [Jev](https://docs.typesafe.ai/introduction) Choice prompt. Cold start: take about 10 buckets and cut a sample of past conversations with them. Tune the buckets by editing the prompt, not by training. Choice `confidence` flags inputs that fall between buckets.
+- **Bandit.** A Beta posterior for each (bucket, model) pair. The router picks the model with the highest `θ − λ·cost`. λ is one knob that means "how much quality per dollar we demand". Every update decays all arms in the bucket toward the prior, so recent outcomes count more and models we stopped using get re-explored.
+- **Reward** is a value in [0, 1]: a Jev Score against a rubric, or several Noul criteria combined in code, plus human feedback ("give me a smarter model"). Fractional updates: `α += r`, `β += 1 − r`.
+- **New models** join with the uniform prior and get explored. Optionally, replay history with the new model to set an informed prior.
+- **Raw log first.** Store each input, model, cost, and outcome. Buckets are a view on top of that log. When the classifier prompt changes, re-classify the history and rebuild the posteriors. The same log lets you test a new bucketing offline before you ship it.
+
+## Open questions
+
+- **Reward bias.** Human feedback is mostly negative and comes mostly from cheap-model routes. Users who say nothing did not necessarily succeed. LLM judges tend to favor long answers and possibly their own model family. Use objective signals where they exist: tests pass, the parent agent accepts the sub-agent's result.
+- **Counterfactual replay** works for self-contained sub-agent tasks. It does not work honestly for multi-turn sessions, because the conversation goes differently once a different model answers.
+- **Exploration costs real users.** Consider a minimum model tier for each bucket and a cap on exploration in high-stakes buckets.
+- **Bucket coherence.** Two warning signs: no model wins despite lots of data, low Choice confidence, or both. Test: split the bucket's history by a sub-feature and check whether the best model changes between the halves.
+- **Scope.** Posteriors per org or per repo, and how to share priors between them.
+
+## Toy
+
+`python3 router.py` runs a simulation with no LLM calls and checks three things:
+
+- The router converges to the cheapest model that is good enough in each bucket.
+- It adapts when a model's quality drifts in the middle of the run.
+- It picks up a model that is added in the middle of the run.
+
+The buckets and rewards are simulated. Jev comes next.
